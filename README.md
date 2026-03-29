@@ -3,40 +3,35 @@
 ## Overview
 
 Mini-UnionFS is a user-space filesystem implemented using FUSE (Filesystem in Userspace).
-It simulates a layered filesystem where an **upper layer** overrides a **lower layer**, similar to how modern container systems (like Docker) manage filesystems.
+It merges two directories — an **upper (writable)** layer and a **lower (read-only)** layer — into a single unified filesystem view.
 
-This project demonstrates core filesystem concepts such as:
+This project demonstrates how modern layered filesystems (like Docker’s OverlayFS) work internally.
 
-* Path resolution across multiple layers
-* Directory merging
+---
+
+## Features
+
+* Layered filesystem (upper + lower)
+* Path resolution with priority handling
 * File read operations
+* Directory merging
 * Whiteout mechanism for file deletion
+* Modular code structure
 
 ---
 
-## Features Implemented (Member 1)
+## How It Works
 
-* Path Resolution (`resolve_path`)
-* File Metadata Handling (`getattr`)
-* File Operations (`open`, `read`)
-* Directory Merging (`readdir`)
-* File Deletion using Whiteout (`unlink`)
-* Permission Handling (`access`)
+### Layers:
 
----
-
-## Working Principle
-
-The filesystem operates on two directories:
-
-* **Lower Layer** → Read-only base layer
+* **Lower Layer** → Base read-only files
 * **Upper Layer** → Writable layer
 
-### Behavior:
+### Rules:
 
-* If a file exists in both → **upper layer is used**
-* If a file exists only in lower → it is read from lower
-* If a file is deleted → a **whiteout file (`.wh.<filename>`)** is created in upper to hide the lower file
+* Upper layer overrides lower layer
+* If file exists only in lower → it is shown
+* If file is deleted → a `.wh.filename` is created in upper
 
 ---
 
@@ -44,21 +39,24 @@ The filesystem operates on two directories:
 
 ```
 mini-unionfs/
-│
 ├── src/
-│   ├── main.c                # FUSE operations (getattr, read, unlink, etc.)
-│   ├── common.h              # Shared structures and constants
-│   ├── path_resolution.c     # Core path resolution logic
-│   └── path_resolution.h     # Header for path resolution
-│
-├── Makefile                  # Build instructions
-├── README.md                 # Project documentation
-├── .gitignore                # Files ignored by Git
+│   ├── main.c
+│   ├── fuse_ops_core.c
+│   ├── file_operations.c
+│   ├── directory_ops.c
+│   ├── whiteout.c
+│   ├── path_resolution.c
+│   ├── path_resolution.h
+│   └── common.h
+├── Makefile
+├── README.md
+├── DESIGN.md
+└── .gitignore
 ```
 
 ---
 
-## 🛠️ Build Instructions
+## Build Instructions
 
 ```bash
 make
@@ -66,7 +64,7 @@ make
 
 ---
 
-## Run Instructions
+## Run
 
 ```bash
 ./mini_unionfs <lower_dir> <upper_dir> <mountpoint>
@@ -75,7 +73,7 @@ make
 ### Example:
 
 ```bash
-mkdir lower upper
+mkdir lower upper /tmp/mnt
 echo "hello" > lower/test.txt
 
 ./mini_unionfs lower upper /tmp/mnt
@@ -85,7 +83,7 @@ echo "hello" > lower/test.txt
 
 ## Testing
 
-### View files:
+### List files:
 
 ```bash
 ls /tmp/mnt
@@ -97,14 +95,14 @@ ls /tmp/mnt
 cat /tmp/mnt/test.txt
 ```
 
-### Delete file (Whiteout test):
+### Delete file (whiteout test):
 
 ```bash
 rm /tmp/mnt/test.txt
 ls -la upper
 ```
 
-Expected:
+Expected output:
 
 ```
 .wh.test.txt
@@ -112,37 +110,32 @@ Expected:
 
 ---
 
-## Key Concept: Whiteout Mechanism
+## Key Concept: Whiteout
 
-When a file from the lower layer is deleted, it cannot be physically removed.
-Instead, a special hidden file is created:
+Instead of deleting from the lower layer, a hidden file is created:
 
 ```
 .wh.filename
 ```
 
-This ensures the file is **hidden from the merged filesystem view**.
+This hides the file from the merged view.
 
 ---
 
 ## Team Contribution
 
-**Member 1 (Core Layer Implementation):**
+**Member 1:**
 
+* FUSE setup and initialization
 * Path resolution logic
-* FUSE initialization
-* File operations (getattr, read, open)
+* File operations (`getattr`, `read`, `open`)
 * Directory merging
-* Whiteout-based deletion
+* Whiteout deletion (`unlink`)
+* Modular code structure
 
 ---
 
-## Notes
-
-* Built and tested on Ubuntu using FUSE3
-* Requires `libfuse3-dev`
-
-Install dependencies:
+## Requirements
 
 ```bash
 sudo apt install libfuse3-dev
@@ -152,8 +145,9 @@ sudo apt install libfuse3-dev
 
 ## Status
 
-✔ Core filesystem implementation complete
-✔ Whiteout mechanism working
-✔ Ready for extension and integration
+✔ Fully working
+✔ Modular structure
+✔ Whiteout implemented
+
 
 ---
