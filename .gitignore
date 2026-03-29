@@ -1,6 +1,5 @@
 mini_unionfs
-*.o
 lower/
 upper/
 mnt/
-
+*.o

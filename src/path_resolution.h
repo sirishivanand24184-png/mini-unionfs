@@ -5,6 +5,6 @@
 
 int resolve_path(struct mini_unionfs_state *state,
                  const char *path,
-                 char *resolved_path);
+                 char *resolved);
 
 #endif
