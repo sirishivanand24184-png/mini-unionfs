@@ -1,198 +1,124 @@
 # Mini-UnionFS Design Document
 
-**Course:** Cloud Computing
-**Module:** FUSE-based Filesystem Implementation
-**Team Member:** Member 1
-
----
-
 ## 1. Introduction
 
-Mini-UnionFS is a user-space filesystem built using FUSE (Filesystem in Userspace) that simulates a layered filesystem architecture. It combines two directories — an **upper (writable) layer** and a **lower (read-only) layer** — into a single unified view.
-
-This design is inspired by modern container storage systems such as Docker’s OverlayFS, where multiple layers are merged to provide efficient file access and modification.
+Mini-UnionFS is a layered filesystem implemented using FUSE. It combines two directories into a single virtual filesystem using an upper and lower layer model.
 
 ---
 
 ## 2. Objectives
 
-The primary objectives of this implementation are:
-
-* To understand filesystem abstraction using FUSE
-* To implement layered file access using upper and lower directories
-* To design efficient path resolution logic
-* To support file metadata and read operations
-* To implement a whiteout mechanism for file deletion
+* Implement a layered filesystem
+* Understand FUSE-based filesystem design
+* Implement file operations and directory merging
+* Handle file deletion using whiteout mechanism
 
 ---
 
 ## 3. System Architecture
 
-The system consists of three main components:
-
 ### 3.1 Upper Layer
 
-* Writable directory
-* Stores modified and newly created files
-* Contains whiteout files for deletions
+* Writable
+* Stores modified and deleted state
+* Contains whiteout files
 
 ### 3.2 Lower Layer
 
-* Read-only directory
-* Contains the base set of files
+* Read-only
+* Contains base files
 
 ### 3.3 Mount Point
 
-* The merged virtual filesystem exposed to the user
-* All operations are performed through this interface
+* Unified view exposed to the user
 
 ---
 
-## 4. Core Design Components
+## 4. Core Components
 
-### 4.1 Global State Management
+### 4.1 Global State
 
-A structure `mini_unionfs_state` is used to maintain:
+`mini_unionfs_state` stores:
 
-* Path to upper directory
-* Path to lower directory
-
-This state is passed to all FUSE operations using `fuse_get_context()`.
+* upper directory path
+* lower directory path
 
 ---
 
-### 4.2 Path Resolution Mechanism
+### 4.2 Path Resolution
 
-The `resolve_path()` function is the core of the filesystem.
+The `resolve_path()` function determines file location.
 
 #### Logic:
 
-1. Construct path in upper layer
-2. Check if a corresponding whiteout file exists
-3. If whiteout exists → return `-ENOENT`
-4. If file exists in upper → return upper path
-5. Else if file exists in lower → return lower path
-6. Otherwise → return `-ENOENT`
-
-This ensures correct precedence and file visibility.
+1. Check whiteout file
+2. Check upper layer
+3. Check lower layer
+4. Return error if not found
 
 ---
 
 ### 4.3 File Operations
 
-#### `getattr()`
+#### getattr()
 
-* Retrieves metadata of files
-* Uses resolved path
-* Ensures correct file attributes
+Retrieves metadata using resolved path.
 
-#### `open()`
+#### open()
 
-* Opens file from resolved path
-* Ensures file accessibility
+Opens file from correct layer.
 
-#### `read()`
+#### read()
 
-* Reads file content from appropriate layer
-* Uses `pread()` for offset-based reading
+Reads content using `pread()`.
 
 ---
 
-### 4.4 Directory Merging (`readdir`)
+### 4.4 Directory Operations
 
-Directory entries from both layers are merged:
+#### readdir()
 
-* Upper layer entries are listed first
-* Duplicate entries from lower are ignored
-* Whiteout files are excluded
-* Hidden files (`.wh.*`) are filtered
-
----
-
-### 4.5 Whiteout Mechanism (Deletion Handling)
-
-Deletion is implemented using a whiteout strategy.
-
-#### Behavior:
-
-* If file exists in upper → directly deleted
-* If file exists only in lower → create `.wh.filename` in upper
-
-#### Purpose:
-
-* Prevents modification of lower (read-only) layer
-* Hides file from merged view
+* Reads upper and lower directories
+* Filters whiteout files
+* Avoids duplicates
 
 ---
 
-### 4.6 Access Control (`access`)
+### 4.5 Whiteout Mechanism
 
-The `access()` function ensures:
+When deleting a file:
 
-* Permission checks before operations
-* Proper interaction with FUSE
-* Enables correct execution of operations like `unlink`
+* If in upper → delete directly
+* If in lower → create `.wh.filename` in upper
 
----
-
-## 5. File Structure
-
-```
-mini-unionfs/
-│
-├── src/
-│   ├── main.c                # FUSE operations
-│   ├── common.h              # Shared definitions
-│   ├── path_resolution.c     # Path resolution logic
-│   └── path_resolution.h
-│
-├── Makefile
-├── README.md
-├── .gitignore
-```
+This hides the file without modifying lower layer.
 
 ---
 
-## 6. Execution Flow
+## 5. Execution Flow
 
-1. User accesses file via mount point
-2. FUSE intercepts system call
-3. Corresponding operation (e.g., `read`, `unlink`) is triggered
-4. `resolve_path()` determines actual file location
-5. Operation is performed on upper or lower layer
-6. Result is returned to user
+1. User accesses file
+2. FUSE intercepts request
+3. Path is resolved
+4. Operation executed on correct layer
+5. Result returned
 
 ---
 
-## 7. Testing and Validation
+## 6. Testing
 
-The system was tested using:
+Test cases include:
 
-* File read operations
+* File read
 * Directory listing
-* Deletion using whiteout
-* Visibility checks across layers
-
-### Example:
-
-```
-echo "hello" > lower/test.txt
-./mini_unionfs lower upper /tmp/mnt
-rm /tmp/mnt/test.txt
-```
-
-Result:
-
-```
-upper/.wh.test.txt
-```
+* Upper override
+* Whiteout deletion
+* Persistence after remount
 
 ---
 
-## 8. Conclusion
+## 7. Conclusion
 
-The Mini-UnionFS successfully demonstrates the implementation of a layered filesystem using FUSE. It provides a clear understanding of path resolution, file abstraction, and deletion mechanisms using whiteout files.
-
-The system is modular, extensible, and serves as a strong foundation for further enhancements such as CoW and advanced filesystem operations.
+Mini-UnionFS successfully demonstrates layered filesystem concepts using FUSE. The implementation is modular, extensible, and closely resembles real-world systems like OverlayFS.
 
 ---
