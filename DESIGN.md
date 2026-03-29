@@ -189,16 +189,7 @@ upper/.wh.test.txt
 
 ---
 
-## 9. Future Enhancements
-
-* Implement Copy-on-Write (CoW)
-* Add support for `mkdir`, `rmdir`
-* Improve performance and caching
-* Add logging and monitoring
-
----
-
-## 10. Conclusion
+## 8. Conclusion
 
 The Mini-UnionFS successfully demonstrates the implementation of a layered filesystem using FUSE. It provides a clear understanding of path resolution, file abstraction, and deletion mechanisms using whiteout files.
 
