@@ -189,15 +189,6 @@ upper/.wh.test.txt
 
 ---
 
-## 8. Limitations
-
-* Write operations (Copy-on-Write) not implemented
-* No support for symbolic links
-* Limited error handling for edge cases
-* Fixed buffer sizes
-
----
-
 ## 9. Future Enhancements
 
 * Implement Copy-on-Write (CoW)
