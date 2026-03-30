@@ -143,6 +143,33 @@ This hides the file from the merged view.
 * Test suite validation (all 3 tests passing)
 ---
 
+**Member 3 (Yogitha):**
+- `readdir()` — merged directory listing (upper + lower, deduped)
+- `unlink()` — deletes from upper or creates whiteout for lower files
+- `mkdir()` — creates new directories in upper layer
+- `rmdir()` — removes directories, creates whiteout if lower copy exists
+- Whiteout helper library (`whiteout.c` / `whiteout.h`):
+  - `is_whiteout_file()` — detects `.wh.*` marker files
+  - `is_whiteout_active()` — checks if a file is hidden by a whiteout
+  - `create_whiteout()` — creates `.wh.<filename>` marker in upper dir
+  - `make_whiteout_name()` — builds whiteout filename from original name
+How the modules connect:
+
+- `main.c` registers all FUSE operations and passes `mini_unionfs_state`
+  (lower_dir + upper_dir) as private data to every callback
+- `common.h` is the single shared header — defines the state struct,
+  MAX_PATH, and declares all function signatures
+- Member 3's `whiteout.c` is used by both `directory_ops.c` (unlink/rmdir)
+  and is the single source of truth for all whiteout logic
+- `readdir()` calls `is_whiteout_active()` to hide deleted files from listing
+- `unlink()` calls `create_whiteout()` instead of touching lower_dir
+- All 3 automated tests pass:
+  - Test 1: Layer Visibility — readdir shows merged view correctly
+  - Test 2: Copy-on-Write — write to lower file copies it to upper first
+  - Test 3: Whiteout — deleting a lower file creates .wh. marker in upper
+ 
+
+
 ## Requirements
 
 ```bash
