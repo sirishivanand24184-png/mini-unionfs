@@ -8,10 +8,11 @@ static struct fuse_operations ops = {
     .access  = unionfs_access,
     .open    = unionfs_open,
     .read    = unionfs_read,
+    .write   = unionfs_write,
+    .create  = unionfs_create,
     .readdir = unionfs_readdir,
     .unlink  = unionfs_unlink,
 };
-
 int main(int argc, char *argv[])
 {
     if (argc < 4) {
@@ -24,7 +25,8 @@ int main(int argc, char *argv[])
     state->lower_dir = realpath(argv[1], NULL);
     state->upper_dir = realpath(argv[2], NULL);
 
-    char *args[] = { argv[0], "-f", argv[3], NULL };
+    // Pass only program name + mountpoint to FUSE (background mode)
+    char *fuse_argv[] = { argv[0], "-o", "auto_unmount", argv[3], NULL };
 
-    return fuse_main(3, args, &ops, state);
+    return fuse_main(4, fuse_argv, &ops, state);
 }
