@@ -8,7 +8,7 @@
 #include <stddef.h>           // size_t
 #include <unistd.h>           // off_t
 
-#define MAX_PATH 1024
+#define MAX_PATH 2048
 
 struct mini_unionfs_state {
     char *lower_dir;
