@@ -17,7 +17,8 @@ This project demonstrates how modern layered filesystems (like Docker’s Overla
 * Directory merging
 * Whiteout mechanism for file deletion
 * Modular code structure
-
+* Copy-on-Write (CoW) for lower layer files
+* New file creation directly in upper layer
 ---
 
 ## How It Works
@@ -49,6 +50,7 @@ mini-unionfs/
 │   ├── path_resolution.h
 │   └── common.h
 ├── Makefile
+├── test_unionfs.sh
 ├── README.md
 ├── DESIGN.md
 └── .gitignore
@@ -133,6 +135,12 @@ This hides the file from the merged view.
 * Whiteout deletion (`unlink`)
 * Modular code structure
 
+**Member 2:**
+* Copy-on-Write (CoW) implementation
+* `write()` operation (writes to upper only)
+* `create()` operation (new files go to upper)
+* CoW trigger in `open()` for write intent
+* Test suite validation (all 3 tests passing)
 ---
 
 ## Requirements
