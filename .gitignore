@@ -3,3 +3,6 @@ lower/
 upper/
 mnt/
 *.o
+*.d
+tests/test_cow
+tests/test_whiteout
