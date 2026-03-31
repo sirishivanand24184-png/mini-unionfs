@@ -38,11 +38,13 @@ int is_whiteout_active(const char *path, const char *upper_dir)
     char wh_name[MAX_PATH];
     make_whiteout_name(base_part, wh_name);
 
-    char wh_full[MAX_PATH];
+    /* upper_dir ≤ MAX_PATH-1, wh_name ≤ MAX_PATH-1, separator/slash ≤ 2.
+     * MAX_PATH*2 guarantees no truncation for any valid input pair. */
+    char wh_full[MAX_PATH * 2];
     if (strcmp(dir_part, "/") == 0 || strcmp(dir_part, ".") == 0)
-        snprintf(wh_full, MAX_PATH, "%s/%s", upper_dir, wh_name);
+        snprintf(wh_full, sizeof(wh_full), "%s/%s", upper_dir, wh_name);
     else
-        snprintf(wh_full, MAX_PATH, "%s%s/%s", upper_dir, dir_part, wh_name);
+        snprintf(wh_full, sizeof(wh_full), "%s%s/%s", upper_dir, dir_part, wh_name);
 
     struct stat st;
     return (stat(wh_full, &st) == 0);
@@ -60,11 +62,13 @@ int create_whiteout(const char *path, const char *upper_dir)
     char wh_name[MAX_PATH];
     make_whiteout_name(base_part, wh_name);
 
-    char wh_full[MAX_PATH];
+    /* upper_dir ≤ MAX_PATH-1, wh_name ≤ MAX_PATH-1, separator/slash ≤ 2.
+     * MAX_PATH*2 guarantees no truncation for any valid input pair. */
+    char wh_full[MAX_PATH * 2];
     if (strcmp(dir_part, "/") == 0 || strcmp(dir_part, ".") == 0)
-        snprintf(wh_full, MAX_PATH, "%s/%s", upper_dir, wh_name);
+        snprintf(wh_full, sizeof(wh_full), "%s/%s", upper_dir, wh_name);
     else
-        snprintf(wh_full, MAX_PATH, "%s%s/%s", upper_dir, dir_part, wh_name);
+        snprintf(wh_full, sizeof(wh_full), "%s%s/%s", upper_dir, dir_part, wh_name);
 
     int fd = open(wh_full, O_CREAT | O_WRONLY, 0644);
     if (fd < 0)

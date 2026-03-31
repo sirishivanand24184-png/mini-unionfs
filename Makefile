@@ -41,7 +41,8 @@ TEST_WHITEOUT = tests/test_whiteout
 DEPFLAGS = -MMD -MP
 DEPS     = $(OBJ:.o=.d)
 
-.PHONY: all release debug install uninstall clean test test-unit test-shell
+.PHONY: all release debug install uninstall clean test test-unit test-shell \
+        test-integration test-all coverage help
 
 # ---------- default target ----------
 all: release
@@ -64,10 +65,10 @@ $(OUT): $(OBJ)
 
 # ---------- build C unit tests ----------
 $(TEST_COW): tests/test_cow.c
-	$(CC) -Wall -Wextra -o $@ $<
+	$(CC) -Wall -Wextra -Werror -o $@ $<
 
 $(TEST_WHITEOUT): tests/test_whiteout.c src/whiteout.c
-	$(CC) -Wall -Wextra -I src $(FUSE_CFLAGS) -o $@ $^
+	$(CC) -Wall -Wextra -Werror -I src $(FUSE_CFLAGS) -o $@ $^
 
 # ---------- install / uninstall ----------
 install: release
@@ -88,6 +89,48 @@ test-shell: release
 	@bash tests/test_unionfs.sh
 
 test: test-unit test-shell
+
+test-integration: release
+	@echo "Running integration test suite..."
+	@bash tests/test_integration.sh
+
+test-all: test-unit test-shell test-integration
+
+# ---------- coverage ----------
+coverage: CFLAGS = $(COMMON_CFLAGS) -g -O0 --coverage
+coverage: clean $(OUT) $(TEST_COW) $(TEST_WHITEOUT)
+	@echo "Running tests with coverage instrumentation..."
+	@$(TEST_COW)   2>/dev/null || true
+	@$(TEST_WHITEOUT) 2>/dev/null || true
+	@gcov $(SRC) 2>/dev/null || true
+	@echo "Coverage data written to *.gcov files"
+
+# ---------- help ----------
+help:
+	@echo ""
+	@echo "Mini-UnionFS Build System"
+	@echo "========================="
+	@echo ""
+	@echo "Build targets:"
+	@echo "  make / make all        Release build (optimised)"
+	@echo "  make release           Same as make all"
+	@echo "  make debug             Debug build with AddressSanitizer"
+	@echo "  make clean             Remove build artefacts"
+	@echo ""
+	@echo "Install targets:"
+	@echo "  make install           Install binary to \$$(PREFIX)/bin  [$(PREFIX)/bin]"
+	@echo "  make uninstall         Remove installed binary"
+	@echo ""
+	@echo "Test targets:"
+	@echo "  make test              C unit tests + shell tests"
+	@echo "  make test-unit         C unit tests only (no FUSE required)"
+	@echo "  make test-shell        Shell integration tests (FUSE required)"
+	@echo "  make test-integration  End-to-end integration tests (FUSE required)"
+	@echo "  make test-all          All test suites"
+	@echo ""
+	@echo "Analysis:"
+	@echo "  make coverage          Build with gcov and run unit tests"
+	@echo ""
 
 # ---------- clean ----------
 clean:

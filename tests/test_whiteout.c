@@ -30,6 +30,11 @@
 #define RED   "\033[0;31m"
 #define NC    "\033[0m"
 
+/* Buffer sizes for path construction in tests.
+ * WH_PATH_BUF fits upper_dir + subdir + whiteout filename with margin. */
+#define SUB_PATH_BUF 4096
+#define WH_PATH_BUF  8192
+
 /* Global counters */
 static int pass_count = 0;
 static int fail_count = 0;
@@ -149,7 +154,7 @@ static void test_is_whiteout_active_false(void)
 static void test_is_whiteout_active_subdirectory(void)
 {
     char *upper = make_tmpdir();
-    char sub[4096], wh[4096];
+    char sub[SUB_PATH_BUF], wh[WH_PATH_BUF];
     snprintf(sub, sizeof(sub), "%s/subdir", upper);
     mkdir(sub, 0755);
     snprintf(wh, sizeof(wh), "%s/.wh.sub.txt", sub);
@@ -192,13 +197,13 @@ static void test_create_whiteout_idempotent(void)
 static void test_create_whiteout_subdir(void)
 {
     char *upper = make_tmpdir();
-    char sub[4096];
+    char sub[SUB_PATH_BUF];
     snprintf(sub, sizeof(sub), "%s/subdir", upper);
     mkdir(sub, 0755);
 
     create_whiteout("/subdir/nested.txt", upper);
 
-    char wh[4096];
+    char wh[WH_PATH_BUF];
     snprintf(wh, sizeof(wh), "%s/.wh.nested.txt", sub);
     struct stat st;
     report("create_whiteout works for files in subdirectories",
