@@ -25,9 +25,7 @@ CFLAGS ?= $(RELEASE_CFLAGS)
 SRC = src/main.c \
       src/path_resolution.c \
       src/fuse_ops_core.c \
-      src/file_operations.c \
-      src/directory_ops.c \
-      src/whiteout.c
+      src/file_operations.c
 
 OBJ = $(SRC:.c=.o)
 
@@ -67,7 +65,7 @@ $(OUT): $(OBJ)
 $(TEST_COW): tests/test_cow.c
 	$(CC) -Wall -Wextra -Werror -o $@ $<
 
-$(TEST_WHITEOUT): tests/test_whiteout.c src/whiteout.c
+$(TEST_WHITEOUT): tests/test_whiteout.c
 	$(CC) -Wall -Wextra -Werror -I src $(FUSE_CFLAGS) -o $@ $^
 
 # ---------- install / uninstall ----------
