@@ -1,5 +1,7 @@
 # Mini-UnionFS
 
+[![CI](https://github.com/sirishivanand24184-png/mini-unionfs/actions/workflows/ci.yml/badge.svg)](https://github.com/sirishivanand24184-png/mini-unionfs/actions/workflows/ci.yml)
+
 ## Overview
 
 Mini-UnionFS is a user-space filesystem implemented using FUSE (Filesystem in Userspace).
@@ -172,15 +174,13 @@ This hides the file from the merged view while leaving the lower layer intact.
 
 ## Documentation
 
-See [`docs/developer_guide.md`](docs/developer_guide.md) for:
-- Detailed build instructions
-- System requirements
-- Architecture overview
-- Test execution guide
-- Troubleshooting
-
-See [`DESIGN.md`](DESIGN.md) for the full design document covering architecture,
-component interactions, and design decisions.
+| Document | Description |
+|----------|-------------|
+| [`docs/BUILD.md`](docs/BUILD.md) | System requirements, build steps, error solutions |
+| [`docs/TESTING.md`](docs/TESTING.md) | Running tests, adding tests, coverage analysis |
+| [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) | Build, runtime, and test issue solutions |
+| [`docs/developer_guide.md`](docs/developer_guide.md) | Full developer reference |
+| [`DESIGN.md`](DESIGN.md) | Architecture, data structures, design decisions |
 
 ---
 
