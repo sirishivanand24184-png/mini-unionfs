@@ -12,6 +12,8 @@ static struct fuse_operations ops = {
     .create  = unionfs_create,
     .readdir = unionfs_readdir,
     .unlink  = unionfs_unlink,
+    .mkdir   = unionfs_mkdir,
+    .rmdir   = unionfs_rmdir,
 };
 int main(int argc, char *argv[])
 {

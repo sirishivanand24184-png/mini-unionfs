@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <libgen.h>
 
 /* ── CoW helper ──────────────────────────────────────────────────────────
  * Copies a file from lower_dir to upper_dir so writes stay in upper.
@@ -154,6 +155,25 @@ int unionfs_create(const char *path, mode_t mode,
     if (fd == -1) return -errno;
 
     close(fd);
+
+    /* Remove any existing whiteout so the new file is visible via getattr */
+    char copy[MAX_PATH];
+    strncpy(copy, path, MAX_PATH - 1);
+    copy[MAX_PATH - 1] = '\0';
+    char copy2[MAX_PATH];
+    strncpy(copy2, path, MAX_PATH - 1);
+    copy2[MAX_PATH - 1] = '\0';
+    char *dir_part  = dirname(copy);
+    char *base_part = basename(copy2);
+    char wh_name[MAX_PATH];
+    snprintf(wh_name, sizeof(wh_name), ".wh.%s", base_part);
+    char wh_path[MAX_PATH];
+    if (strcmp(dir_part, "/") == 0 || strcmp(dir_part, ".") == 0)
+        snprintf(wh_path, sizeof(wh_path), "%s/%s", state->upper_dir, wh_name);
+    else
+        snprintf(wh_path, sizeof(wh_path), "%s%s/%s", state->upper_dir, dir_part, wh_name);
+    unlink(wh_path); /* ignore error – whiteout may not exist */
+
     printf("CREATE: %s → upper\n", path);
     return 0;
 }
