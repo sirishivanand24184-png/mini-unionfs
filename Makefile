@@ -25,9 +25,7 @@ CFLAGS ?= $(RELEASE_CFLAGS)
 SRC = src/main.c \
       src/path_resolution.c \
       src/fuse_ops_core.c \
-      src/file_operations.c \
-      src/directory_ops.c \
-      src/whiteout.c
+      src/file_operations.c
 
 OBJ = $(SRC:.c=.o)
 
@@ -67,8 +65,8 @@ $(OUT): $(OBJ)
 $(TEST_COW): tests/test_cow.c
 	$(CC) -Wall -Wextra -Werror -o $@ $<
 
-$(TEST_WHITEOUT): tests/test_whiteout.c src/whiteout.c
-	$(CC) -Wall -Wextra -Werror -I src $(FUSE_CFLAGS) -o $@ $^
+# NOTE: $(TEST_WHITEOUT) cannot be built until src/whiteout.c and src/whiteout.h
+# are implemented by Team Member 3.
 
 # ---------- install / uninstall ----------
 install: release
@@ -79,10 +77,9 @@ uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/$(OUT)
 
 # ---------- test targets ----------
-test-unit: $(TEST_COW) $(TEST_WHITEOUT)
+test-unit: $(TEST_COW)
 	@echo "Running C unit tests..."
 	@$(TEST_COW)
-	@$(TEST_WHITEOUT)
 
 test-shell: release
 	@echo "Running shell test suite..."
@@ -98,10 +95,9 @@ test-all: test-unit test-shell test-integration
 
 # ---------- coverage ----------
 coverage: CFLAGS = $(COMMON_CFLAGS) -g -O0 --coverage
-coverage: clean $(OUT) $(TEST_COW) $(TEST_WHITEOUT)
+coverage: clean $(OUT) $(TEST_COW)
 	@echo "Running tests with coverage instrumentation..."
 	@$(TEST_COW)   2>/dev/null || true
-	@$(TEST_WHITEOUT) 2>/dev/null || true
 	@gcov $(SRC) 2>/dev/null || true
 	@echo "Coverage data written to *.gcov files"
 
