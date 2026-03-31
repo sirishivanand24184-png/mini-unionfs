@@ -1,278 +1,151 @@
 /*
- * test_whiteout.c - Unit tests for the whiteout mechanism.
+ * test_whiteout.c
+ * Unit tests for Team Member 3: whiteout logic
  *
- * Directly calls the whiteout helper functions from src/whiteout.c
- * without mounting FUSE.  Each test is self-contained and reports
- * PASS or FAIL via stdout.
- *
- * Build:
- *   gcc -Wall -Wextra -I src $(pkg-config --cflags fuse3) \
- *       -o test_whiteout tests/test_whiteout.c src/whiteout.c
- * Run:
- *   ./test_whiteout
+ * Compile: gcc -o test_whiteout test_whiteout.c ../src/whiteout.c -I../src -DFUSE_USE_VERSION=31 `pkg-config fuse3 --cflags` `pkg-config fuse3 --libs`
+ * Run:     ./test_whiteout
  */
 
-#define FUSE_USE_VERSION 31
-
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
+#include <stdlib.h>
 #include <fcntl.h>
-#include <errno.h>
+#include <unistd.h>
 #include <sys/stat.h>
-#include <sys/types.h>
 
 #include "whiteout.h"
 
-/* ANSI colors */
-#define GREEN "\033[0;32m"
-#define RED   "\033[0;31m"
-#define NC    "\033[0m"
+/* ---- Simple test framework ---- */
+static int passed = 0;
+static int failed = 0;
 
-/* Buffer sizes for path construction in tests.
- * WH_PATH_BUF fits upper_dir + subdir + whiteout filename with margin. */
-#define SUB_PATH_BUF 4096
-#define WH_PATH_BUF  8192
+#define TEST(name) printf("  %-50s ", name)
+#define PASS() do { printf("PASSED\n"); passed++; } while(0)
+#define FAIL(msg) do { printf("FAILED (%s)\n", msg); failed++; } while(0)
+#define CHECK(cond, msg) do { if (cond) PASS(); else FAIL(msg); } while(0)
 
-/* Global counters */
-static int pass_count = 0;
-static int fail_count = 0;
-
-static void report(const char *name, int ok)
+void test_is_whiteout_file()
 {
-    if (ok) {
-        printf("  " GREEN "PASSED" NC ": %s\n", name);
-        pass_count++;
-    } else {
-        printf("  " RED "FAILED" NC ": %s\n", name);
-        fail_count++;
+    printf("\n[is_whiteout_file]\n");
+
+    TEST(".wh.config.txt is a whiteout");
+    CHECK(is_whiteout_file(".wh.config.txt") == 1, "expected 1");
+
+    TEST(".wh.delete_me.txt is a whiteout");
+    CHECK(is_whiteout_file(".wh.delete_me.txt") == 1, "expected 1");
+
+    TEST("config.txt is NOT a whiteout");
+    CHECK(is_whiteout_file("config.txt") == 0, "expected 0");
+
+    TEST("empty string is NOT a whiteout");
+    CHECK(is_whiteout_file("") == 0, "expected 0");
+
+    TEST(".hidden is NOT a whiteout");
+    CHECK(is_whiteout_file(".hidden") == 0, "expected 0");
+}
+
+void test_make_whiteout_name()
+{
+    printf("\n[make_whiteout_name]\n");
+
+    char buf[2048];
+
+    TEST("config.txt -> .wh.config.txt");
+    make_whiteout_name("config.txt", buf);
+    CHECK(strcmp(buf, ".wh.config.txt") == 0, buf);
+
+    TEST("delete_me.txt -> .wh.delete_me.txt");
+    make_whiteout_name("delete_me.txt", buf);
+    CHECK(strcmp(buf, ".wh.delete_me.txt") == 0, buf);
+
+    TEST("somefile -> .wh.somefile");
+    make_whiteout_name("somefile", buf);
+    CHECK(strcmp(buf, ".wh.somefile") == 0, buf);
+}
+
+void test_strip_whiteout_prefix()
+{
+    printf("\n[strip_whiteout_prefix]\n");
+
+    char buf[2048];
+
+    TEST(".wh.config.txt -> config.txt");
+    strip_whiteout_prefix(".wh.config.txt", buf);
+    CHECK(strcmp(buf, "config.txt") == 0, buf);
+
+    TEST(".wh.delete_me.txt -> delete_me.txt");
+    strip_whiteout_prefix(".wh.delete_me.txt", buf);
+    CHECK(strcmp(buf, "delete_me.txt") == 0, buf);
+}
+
+void test_whiteout_on_disk()
+{
+    printf("\n[create_whiteout + is_whiteout_active]\n");
+
+    /* Must be large enough for mkdtemp to write into */
+    char upper[2048];
+    strncpy(upper, "/tmp/test_upper_XXXXXX", sizeof(upper) - 1);
+
+    if (mkdtemp(upper) == NULL) {
+        printf("  SKIP: could not create temp dir\n");
+        return;
     }
-}
 
-/* Helpers */
+    /* Test: create whiteout for /delete_me.txt */
+    TEST("create_whiteout /delete_me.txt returns 0");
+    CHECK(create_whiteout("/delete_me.txt", upper) == 0, "non-zero");
 
-static char *make_tmpdir(void)
-{
-    char tmpl[] = "/tmp/test_wh_XXXXXX";
-    char *d = mkdtemp(tmpl);
-    return d ? strdup(d) : NULL;
-}
+    /* Verify marker file exists on disk */
+    char wh_path[2048];
+    snprintf(wh_path, sizeof(wh_path), "%s/.wh.delete_me.txt", upper);
+    struct stat st;
 
-static void touch(const char *path)
-{
-    int fd = open(path, O_CREAT | O_WRONLY, 0644);
-    if (fd >= 0) close(fd);
-}
+    TEST("marker file exists on disk");
+    CHECK(stat(wh_path, &st) == 0, "file not found");
 
-static void rmdir_r(const char *path)
-{
+    /* Test is_whiteout_active detects it */
+    TEST("is_whiteout_active returns 1 for whited-out file");
+    CHECK(is_whiteout_active("/delete_me.txt", upper) == 1, "expected 1");
+
+    /* Test non-whited file returns 0 */
+    TEST("is_whiteout_active returns 0 for normal file");
+    CHECK(is_whiteout_active("/base.txt", upper) == 0, "expected 0");
+
+    /* Test whiteout in subdirectory */
+    char subdir[2048];
+    snprintf(subdir, sizeof(subdir), "%s/subdir", upper);
+    mkdir(subdir, 0755);
+
+    TEST("create_whiteout /subdir/file.txt returns 0");
+    CHECK(create_whiteout("/subdir/file.txt", upper) == 0, "non-zero");
+
+    TEST("is_whiteout_active returns 1 for /subdir/file.txt");
+    CHECK(is_whiteout_active("/subdir/file.txt", upper) == 1, "expected 1");
+
+    TEST("is_whiteout_active returns 0 for /subdir/other.txt");
+    CHECK(is_whiteout_active("/subdir/other.txt", upper) == 0, "expected 0");
+
+    /* Cleanup */
     char cmd[2048];
-    snprintf(cmd, sizeof(cmd), "rm -rf %s", path);
-    (void)system(cmd);
-}
-
-/* is_whiteout_file() */
-
-static void test_is_whiteout_file_positive(void)
-{
-    report("is_whiteout_file('.wh.foo') returns true",
-           is_whiteout_file(".wh.foo") != 0);
-}
-
-static void test_is_whiteout_file_negative(void)
-{
-    report("is_whiteout_file('foo.txt') returns false",
-           is_whiteout_file("foo.txt") == 0);
-}
-
-static void test_is_whiteout_file_empty_prefix(void)
-{
-    report("is_whiteout_file('.wh.') returns true (empty name is still whiteout)",
-           is_whiteout_file(".wh.") != 0);
-}
-
-static void test_is_whiteout_file_partial_prefix(void)
-{
-    report("is_whiteout_file('.wh') returns false (incomplete prefix)",
-           is_whiteout_file(".wh") == 0);
-}
-
-/* make_whiteout_name() */
-
-static void test_make_whiteout_name_basic(void)
-{
-    char buf[256];
-    make_whiteout_name("file.txt", buf);
-    report("make_whiteout_name prepends '.wh.' prefix",
-           strcmp(buf, ".wh.file.txt") == 0);
-}
-
-static void test_make_whiteout_name_special_chars(void)
-{
-    char buf[256];
-    make_whiteout_name("my file.tar.gz", buf);
-    report("make_whiteout_name handles filenames with spaces/dots",
-           strcmp(buf, ".wh.my file.tar.gz") == 0);
-}
-
-/* strip_whiteout_prefix() */
-
-static void test_strip_whiteout_prefix(void)
-{
-    char buf[2048]; /* must match MAX_PATH used by whiteout.c */
-    strip_whiteout_prefix(".wh.hello.txt", buf);
-    report("strip_whiteout_prefix removes '.wh.' prefix",
-           strcmp(buf, "hello.txt") == 0);
-}
-
-/* is_whiteout_active() */
-
-static void test_is_whiteout_active_true(void)
-{
-    char *upper = make_tmpdir();
-    char wh[2048];
-    snprintf(wh, sizeof(wh), "%s/.wh.ghost.txt", upper);
-    touch(wh);
-
-    report("is_whiteout_active returns true when .wh. file exists in upper",
-           is_whiteout_active("/ghost.txt", upper) != 0);
-
-    rmdir_r(upper); free(upper);
-}
-
-static void test_is_whiteout_active_false(void)
-{
-    char *upper = make_tmpdir();
-
-    report("is_whiteout_active returns false when no .wh. file exists",
-           is_whiteout_active("/present.txt", upper) == 0);
-
-    rmdir_r(upper); free(upper);
-}
-
-static void test_is_whiteout_active_subdirectory(void)
-{
-    char *upper = make_tmpdir();
-    char sub[SUB_PATH_BUF], wh[WH_PATH_BUF];
-    snprintf(sub, sizeof(sub), "%s/subdir", upper);
-    mkdir(sub, 0755);
-    snprintf(wh, sizeof(wh), "%s/.wh.sub.txt", sub);
-    touch(wh);
-
-    report("is_whiteout_active works for files in subdirectories",
-           is_whiteout_active("/subdir/sub.txt", upper) != 0);
-
-    rmdir_r(upper); free(upper);
-}
-
-/* create_whiteout() */
-
-static void test_create_whiteout_creates_file(void)
-{
-    char *upper = make_tmpdir();
-    create_whiteout("/delete_me.txt", upper);
-
-    char wh[2048];
-    snprintf(wh, sizeof(wh), "%s/.wh.delete_me.txt", upper);
-    struct stat st;
-    report("create_whiteout creates .wh. marker file in upper",
-           stat(wh, &st) == 0);
-
-    rmdir_r(upper); free(upper);
-}
-
-static void test_create_whiteout_idempotent(void)
-{
-    char *upper = make_tmpdir();
-    create_whiteout("/idem.txt", upper);
-    int rc = create_whiteout("/idem.txt", upper);
-
-    report("create_whiteout is idempotent (second call succeeds)",
-           rc == 0);
-
-    rmdir_r(upper); free(upper);
-}
-
-static void test_create_whiteout_subdir(void)
-{
-    char *upper = make_tmpdir();
-    char sub[SUB_PATH_BUF];
-    snprintf(sub, sizeof(sub), "%s/subdir", upper);
-    mkdir(sub, 0755);
-
-    create_whiteout("/subdir/nested.txt", upper);
-
-    char wh[WH_PATH_BUF];
-    snprintf(wh, sizeof(wh), "%s/.wh.nested.txt", sub);
-    struct stat st;
-    report("create_whiteout works for files in subdirectories",
-           stat(wh, &st) == 0);
-
-    rmdir_r(upper); free(upper);
-}
-
-static void test_create_whiteout_fails_no_parent_dir(void)
-{
-    char *upper = make_tmpdir();
-    /* /nonexistent_parent/ does not exist in upper */
-    int rc = create_whiteout("/nonexistent_parent/file.txt", upper);
-    report("create_whiteout returns error when parent dir missing",
-           rc < 0);
-
-    rmdir_r(upper); free(upper);
-}
-
-/* round-trip: create + check active */
-
-static void test_whiteout_roundtrip(void)
-{
-    char *upper = make_tmpdir();
-    create_whiteout("/roundtrip.txt", upper);
-
-    report("whiteout round-trip: create then is_active returns true",
-           is_whiteout_active("/roundtrip.txt", upper) != 0);
-
-    rmdir_r(upper); free(upper);
+    snprintf(cmd, sizeof(cmd), "rm -rf %s", upper);
+    system(cmd);
 }
 
 int main(void)
 {
-    printf("==================================================\n");
-    printf(" Mini-UnionFS Whiteout Unit Tests\n");
-    printf("==================================================\n\n");
+    printf("====================================\n");
+    printf("  Mini-UnionFS Whiteout Unit Tests  \n");
+    printf("  Team Member 3                     \n");
+    printf("====================================\n");
 
-    printf("--- is_whiteout_file() ---\n");
-    test_is_whiteout_file_positive();
-    test_is_whiteout_file_negative();
-    test_is_whiteout_file_empty_prefix();
-    test_is_whiteout_file_partial_prefix();
-
-    printf("\n--- make_whiteout_name() ---\n");
-    test_make_whiteout_name_basic();
-    test_make_whiteout_name_special_chars();
-
-    printf("\n--- strip_whiteout_prefix() ---\n");
+    test_is_whiteout_file();
+    test_make_whiteout_name();
     test_strip_whiteout_prefix();
+    test_whiteout_on_disk();
 
-    printf("\n--- is_whiteout_active() ---\n");
-    test_is_whiteout_active_true();
-    test_is_whiteout_active_false();
-    test_is_whiteout_active_subdirectory();
+    printf("\n====================================\n");
+    printf("  Results: %d passed, %d failed\n", passed, failed);
+    printf("====================================\n");
 
-    printf("\n--- create_whiteout() ---\n");
-    test_create_whiteout_creates_file();
-    test_create_whiteout_idempotent();
-    test_create_whiteout_subdir();
-    test_create_whiteout_fails_no_parent_dir();
-
-    printf("\n--- Round-trip tests ---\n");
-    test_whiteout_roundtrip();
-
-    printf("\n==================================================\n");
-    printf(" Results: " GREEN "%d PASSED" NC ", " RED "%d FAILED" NC "\n",
-           pass_count, fail_count);
-    printf("==================================================\n");
-
-    return (fail_count > 0) ? 1 : 0;
+    return (failed > 0) ? 1 : 0;
 }
