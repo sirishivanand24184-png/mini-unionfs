@@ -25,7 +25,8 @@ CFLAGS ?= $(RELEASE_CFLAGS)
 SRC = src/main.c \
       src/path_resolution.c \
       src/fuse_ops_core.c \
-      src/file_operations.c
+      src/file_operations.c \
+      src/directory_ops.c
 
 OBJ = $(SRC:.c=.o)
 
